@@ -1,78 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 void main() {
   runApp(const ProjectTaskManagerApp());
-}
-
-// Halaman Login sederhana
-class LoginPage extends StatelessWidget {
-  const LoginPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0A2E5C),
-      body: Center(
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          width: 300,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                "Login",
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0A2E5C),
-                ),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                decoration: InputDecoration(
-                  labelText: "Email",
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                obscureText: true,
-                decoration: InputDecoration(
-                  labelText: "Password",
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (_) => const DashboardPage()),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0A2E5C),
-                  minimumSize: const Size(double.infinity, 50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text("Login"),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class ProjectTaskManagerApp extends StatelessWidget {
@@ -84,6 +14,104 @@ class ProjectTaskManagerApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Project Task Manager',
       home: const LoginPage(),
+    );
+  }
+}
+
+class LoginPage extends StatelessWidget {
+  const LoginPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0A2E5C),
+      body: Center(
+        child: SingleChildScrollView(
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            margin: const EdgeInsets.symmetric(horizontal: 24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SvgPicture.asset('assets/logotask.svg', height: 80),
+                const SizedBox(height: 20),
+                const Text(
+                  "Login to your account",
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0A2E5C),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                TextField(
+                  decoration: InputDecoration(
+                    labelText: "Email",
+                    prefixIcon: const Icon(Icons.email_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                TextField(
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: "Password",
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (_) => const DashboardPage()),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0A2E5C),
+                    minimumSize: const Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text("Login"),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  "Or sign-in with:",
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0A2E5C),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                SvgPicture.asset('assets/icongoogle.svg', height: 20),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -100,7 +128,6 @@ class DashboardPage extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            // Profile
             ListTile(
               leading: GestureDetector(
                 onTap: () {
@@ -124,17 +151,13 @@ class DashboardPage extends StatelessWidget {
               ),
             ),
 
-            // Body utama scrollable
             Expanded(
               child: Stack(
                 children: [
                   SingleChildScrollView(
-                    padding: const EdgeInsets.only(
-                      bottom: 140,
-                    ), // space untuk footer biru + putih
+                    padding: const EdgeInsets.only(bottom: 140),
                     child: Column(
                       children: [
-                        // Must To Do
                         _buildCard(
                           title: "Must To Do",
                           child: GestureDetector(
@@ -213,7 +236,6 @@ class DashboardPage extends StatelessWidget {
                           ),
                         ),
 
-                        // Menu di background biru
                         Container(
                           color: primaryBlue,
                           padding: const EdgeInsets.symmetric(
@@ -242,11 +264,10 @@ class DashboardPage extends StatelessWidget {
                     ),
                   ),
 
-                  // Footer putih menempel di bawah
                   Align(
                     alignment: Alignment.bottomCenter,
                     child: Container(
-                      height: 80,
+                      height: 120,
                       width: double.infinity,
                       decoration: const BoxDecoration(
                         color: Colors.white,
@@ -265,7 +286,6 @@ class DashboardPage extends StatelessWidget {
                     ),
                   ),
 
-                  // Footer biru menempel di atas footer putih
                   Align(
                     alignment: Alignment.bottomCenter,
                     child: Container(
@@ -276,7 +296,17 @@ class DashboardPage extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
                           _buildFooterMenu(Icons.home, "Home"),
-                          _buildFooterMenu(Icons.add_circle, "Create"),
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const CreateGroupPage(),
+                                ),
+                              );
+                            },
+                            child: _buildFooterMenu(Icons.add_circle, "Create"),
+                          ),
                           _buildFooterMenu(Icons.settings, "Setting"),
                         ],
                       ),
@@ -291,7 +321,6 @@ class DashboardPage extends StatelessWidget {
     );
   }
 
-  // Fungsi untuk menampilkan bottom sheet profil
   void _showProfileOptions(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -403,7 +432,89 @@ class DashboardPage extends StatelessWidget {
   }
 }
 
-// Halaman dummy untuk navigasi
+class CreateGroupPage extends StatefulWidget {
+  const CreateGroupPage({super.key});
+
+  @override
+  CreateGroupPageState createState() => CreateGroupPageState();
+}
+
+class CreateGroupPageState extends State<CreateGroupPage> {
+  final TextEditingController groupNameController = TextEditingController();
+  final TextEditingController memberController = TextEditingController();
+
+  List<String> members = [];
+
+  void _addMember() {
+    if (memberController.text.isNotEmpty) {
+      setState(() {
+        members.add(memberController.text);
+        memberController.clear();
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Create Group"),
+        backgroundColor: const Color(0xFF0A2E5C),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: groupNameController,
+              decoration: const InputDecoration(
+                labelText: "Group Name",
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: memberController,
+                    decoration: const InputDecoration(
+                      labelText: "Add Member",
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                ElevatedButton(
+                  onPressed: _addMember,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0A2E5C),
+                  ),
+                  child: const Text("Add"),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              "Members:",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            Expanded(
+              child: ListView.builder(
+                itemCount: members.length,
+                itemBuilder: (context, index) {
+                  return ListTile(title: Text(members[index]));
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class DummyPage extends StatelessWidget {
   final String title;
   const DummyPage({super.key, required this.title});
@@ -420,7 +531,6 @@ class DummyPage extends StatelessWidget {
   }
 }
 
-// Halaman Must To Do
 class MustToDoPage extends StatelessWidget {
   const MustToDoPage({super.key});
 
@@ -436,7 +546,6 @@ class MustToDoPage extends StatelessWidget {
   }
 }
 
-// Halaman Schedule
 class SchedulePage extends StatelessWidget {
   const SchedulePage({super.key});
 
