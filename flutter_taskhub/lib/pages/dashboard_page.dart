@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../utils/navigation_helper.dart';
 import 'create_group_page.dart';
-import 'dummy_page.dart';
-import 'musttodo_page.dart';
+import 'taskmanage.dart';
 import 'schedule_page.dart';
-import 'login_page.dart';
+import '../auth/login_page.dart';
+import 'chat_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -30,10 +31,14 @@ class _DashboardPageState extends State<DashboardPage> {
         navigateWithFade(context, const CreateGroupPage());
         break;
       case 3:
-        navigateWithFade(context, DummyPage(title: "Chat"));
-        break;
-      case 4:
-        navigateWithFade(context, DummyPage(title: "Settings"));
+        navigateWithFade(
+          context,
+          ChatPage(
+            groupTitle: "Kelompok 2",
+            members: const ["Andhika", "zaki", "Najuan"],
+          ),
+        );
+
         break;
     }
   }
@@ -45,6 +50,7 @@ class _DashboardPageState extends State<DashboardPage> {
       body: SafeArea(
         child: Column(
           children: [
+            // Header profile
             ListTile(
               leading: GestureDetector(
                 onTap: () => _showProfileOptions(context),
@@ -66,38 +72,16 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
             ),
 
+            // Content
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.only(bottom: 80),
                 child: Column(
                   children: [
-                    _buildCard(
-                      title: "Must To Do",
-                      child: GestureDetector(
-                        onTap: () =>
-                            navigateWithFade(context, const MustToDoPage()),
-                        child: Container(
-                          height: 100,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[300],
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.add,
-                                  size: 30,
-                                  color: Colors.black54,
-                                ),
-                                Text("Add your Task Here"),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+                    // Must To Do baru (sesuai desain)
+                    _buildMustToDoSection(context),
+
+                    // Schedule
                     _buildCard(
                       title: "Schedule",
                       child: GestureDetector(
@@ -130,6 +114,8 @@ class _DashboardPageState extends State<DashboardPage> {
                         ),
                       ),
                     ),
+
+                    // Menu bawah (Chat / Video / ChatBot / Calendar)
                     Container(
                       color: primaryBlue,
                       padding: const EdgeInsets.symmetric(
@@ -139,13 +125,44 @@ class _DashboardPageState extends State<DashboardPage> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          _buildMenu(Icons.chat, "Chat Group", context),
-                          _buildMenu(Icons.video_call, "Conference", context),
+                          _buildMenu(
+                            Icons.chat,
+                            "Chat Group",
+                            context,
+                            onTap: () {
+                              navigateWithFade(
+                                context,
+                                ChatPage(
+                                  groupTitle: "Kelompok Dummy",
+                                  members: const ["Andhika", "Budi", "Siti"],
+                                ),
+                              );
+                            },
+                          ),
+
+                          _buildMenu(
+                            Icons.video_call,
+                            "Conference",
+                            context,
+                            onTap: () async {
+                              final Uri url = Uri.parse(
+                                "http://meet.google.com/nzo-xscv-fej",
+                              );
+                              if (!await launchUrl(
+                                url,
+                                mode: LaunchMode.externalApplication,
+                              )) {
+                                throw Exception('Could not launch $url');
+                              }
+                            },
+                          ),
                           _buildMenu(Icons.smart_toy, "ChatBot", context),
                           _buildMenu(Icons.calendar_month, "Calendar", context),
                         ],
                       ),
                     ),
+
+                    // Berita
                     Container(
                       margin: const EdgeInsets.all(16),
                       padding: const EdgeInsets.all(20),
@@ -169,6 +186,7 @@ class _DashboardPageState extends State<DashboardPage> {
         ),
       ),
 
+      // Bottom Navigation
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: primaryBlue,
@@ -192,7 +210,7 @@ class _DashboardPageState extends State<DashboardPage> {
           items: const [
             BottomNavigationBarItem(
               icon: Icon(Icons.task_alt_outlined),
-              label: 'To Do',
+              label: 'TASK Manage',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.calendar_month_outlined),
@@ -219,6 +237,68 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
     );
   }
+
+  // ==== WIDGET KHUSUS MUST TO DO DI DASHBOARD ====
+
+  Widget _buildMustToDoSection(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header + See All
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                "Task Manage",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              TextButton(
+                onPressed: () =>
+                    navigateWithFade(context, const MustToDoPage()),
+                child: const Text("See All", style: TextStyle(fontSize: 12)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // hanya 3 task teratas sebagai preview
+          ...dummyTasks.take(3).map((task) => TaskCard(task: task)),
+
+          const SizedBox(height: 16),
+          const Text(
+            'Progress Accumulative',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: LinearProgressIndicator(
+                    value: 0.6,
+                    minHeight: 6,
+                    backgroundColor: Colors.grey[300],
+                    valueColor: AlwaysStoppedAnimation<Color>(primaryBlue),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text('60%', style: TextStyle(fontWeight: FontWeight.bold)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==== WIDGET LAIN ====
 
   void _showProfileOptions(BuildContext context) {
     showModalBottomSheet(
@@ -279,9 +359,14 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _buildMenu(IconData icon, String title, BuildContext context) {
+  Widget _buildMenu(
+    IconData icon,
+    String title,
+    BuildContext context, {
+    Function()? onTap,
+  }) {
     return GestureDetector(
-      onTap: () => navigateWithFade(context, DummyPage(title: title)),
+      onTap: onTap ?? () => navigateWithFade,
       child: Column(
         children: [
           Container(

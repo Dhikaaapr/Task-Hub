@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../pages/taskmanage.dart';
 import 'create_chat_group_page.dart';
 
 class CreateGroupPage extends StatefulWidget {
@@ -24,6 +25,9 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
         .toList();
 
     if (groupName.isNotEmpty && members.isNotEmpty) {
+      // 🔥 Simpan group ke TaskManage
+      addGroupToTasks(groupName, members);
+
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -33,9 +37,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Isi nama kelompok dan anggota minimal 1."),
-        ),
+        const SnackBar(content: Text("Isi nama kelompok & minimal 1 anggota")),
       );
     }
   }
@@ -67,7 +69,8 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                   style: TextStyle(color: Colors.white70),
                 ),
               ),
-              const SizedBox(height: 15),
+
+              const SizedBox(height: 20),
               const Center(
                 child: Text(
                   "Buat Kelompok",
@@ -78,13 +81,16 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+
+              const SizedBox(height: 20),
               _buildTextField("Nama Kelompok", groupNameController),
               const SizedBox(height: 16),
+
               for (int i = 0; i < memberControllers.length; i++) ...[
                 _buildTextField("Nama Anggota ${i + 1}", memberControllers[i]),
                 const SizedBox(height: 16),
               ],
+
               Center(
                 child: ElevatedButton(
                   onPressed: () {
@@ -96,11 +102,11 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                     backgroundColor: Colors.white,
                     foregroundColor: const Color(0xFF0A2E5C),
                     shape: const CircleBorder(),
-                    padding: const EdgeInsets.all(12),
                   ),
-                  child: const Icon(Icons.add, size: 28),
+                  child: const Icon(Icons.add),
                 ),
               ),
+
               const Spacer(),
               ElevatedButton(
                 onPressed: _goToNextPage,
@@ -109,7 +115,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                   foregroundColor: const Color(0xFF0A2E5C),
                   minimumSize: const Size(double.infinity, 48),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius: BorderRadius.circular(30),
                   ),
                 ),
                 child: const Text(
@@ -127,23 +133,15 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
   Widget _buildTextField(String label, TextEditingController controller) {
     return TextField(
       controller: controller,
-      style: const TextStyle(color: Colors.black), // teks input berwarna hitam
+      style: const TextStyle(color: Colors.black),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(color: Colors.black54),
-        floatingLabelStyle: const TextStyle(
-          color: Colors.black87,
-          fontWeight: FontWeight.bold,
-        ),
         filled: true,
         fillColor: Colors.white,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(30),
           borderSide: BorderSide.none,
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 12,
         ),
       ),
     );
