@@ -1,51 +1,61 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
-class GoogleAuthService {
-  static final FirebaseAuth _auth = FirebaseAuth.instance;
+class AuthService {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // WAJIB pakai named constructor di v7.x
-  static final GoogleSignIn _googleSignIn = GoogleSignIn.standard(
+  // ✅ INI VALID & STABIL
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email'],
   );
 
-  /// SIGN IN GOOGLE (NATIVE)
-  static Future<UserCredential?> signInWithGoogle() async {
-    try {
-      // Buka dialog akun Google
-      final GoogleSignInAccount? googleUser =
-          await _googleSignIn.signIn();
-
-      if (googleUser == null) {
-        // User cancel login
-        return null;
-      }
-
-      // Ambil token
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-
-      // Buat credential Firebase
-      final OAuthCredential credential =
-          GoogleAuthProvider.credential(
-        idToken: googleAuth.idToken,
-        accessToken: googleAuth.accessToken,
-      );
-
-      // Login Firebase
-      return await _auth.signInWithCredential(credential);
-    } catch (e) {
-      print('❌ Google Sign In Error: $e');
-      rethrow;
-    }
+  // =====================
+  // LOGIN EMAIL & PASSWORD
+  // =====================
+  Future<User?> signInWithEmail(String email, String password) async {
+    final credential = await _auth.signInWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+    return credential.user;
   }
 
-  /// LOGOUT
-  static Future<void> signOut() async {
+  // =====================
+  // REGISTER EMAIL
+  // =====================
+  Future<User?> registerWithEmail(String email, String password) async {
+    final credential = await _auth.createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+    return credential.user;
+  }
+
+  // =====================
+  // LOGIN GOOGLE (AMAN)
+  // =====================
+  Future<User?> signInWithGoogle() async {
+    final GoogleSignInAccount? googleUser =
+        await _googleSignIn.signIn();
+
+    if (googleUser == null) return null;
+
+    final GoogleSignInAuthentication googleAuth =
+        await googleUser.authentication;
+
+    final credential = GoogleAuthProvider.credential(
+      idToken: googleAuth.idToken,
+      accessToken: googleAuth.accessToken,
+    );
+
+    final userCredential =
+        await _auth.signInWithCredential(credential);
+
+    return userCredential.user;
+  }
+
+  Future<void> signOut() async {
     await _googleSignIn.signOut();
     await _auth.signOut();
   }
-
-  /// USER SAAT INI
-  static User? get currentUser => _auth.currentUser;
 }
