@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1033063893602",
+    "project_id": "taskhub-paramadina",
+    "storage_bucket": "taskhub-paramadina.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1033063893602:android:e3751abf5d3fccb39a5f3b",
+        "android_client_info": {
+          "package_name": "com.example.flutter_taskhub"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAfjtIYPSRJAJFHJqmEx61yMsWQPUMWSLM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,19 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'auth/login_page.dart';
 
-void main() {
-  runApp(const ProjectTaskManagerApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  runApp(const MyApp());
 }
 
-class ProjectTaskManagerApp extends StatelessWidget {
-  const ProjectTaskManagerApp({super.key});
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Project Task Manager',
-      home: LoginPage(),
+      title: 'TaskHub',
+      theme: ThemeData(
+        primaryColor: const Color(0xFF0A2E5C),
+      ),
+      home: const LoginPage(),
     );
   }
 }
