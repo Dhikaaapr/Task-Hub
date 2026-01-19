@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_taskhub/models/notification.dart' as app_notification;
-import 'package:flutter_taskhub/services/notification_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../services/notification_provider.dart';
+import 'group_detail_page.dart';
 
 class NotificationPage extends StatelessWidget {
   const NotificationPage({super.key});
@@ -13,11 +15,11 @@ class NotificationPage extends StatelessWidget {
         title: const Text('Notifications'),
         actions: [
           Consumer<NotificationProvider>(
-            builder: (context, notificationProvider, child) {
-              if (notificationProvider.unreadCount > 0) {
+            builder: (context, p, child) {
+              if (p.unreadCount > 0) {
                 return IconButton(
-                  icon: const Icon(Icons.markunread_mailbox),
-                  onPressed: () => notificationProvider.markAllAsRead(),
+                  icon: const Icon(Icons.mark_email_read),
+                  onPressed: () => p.markAllAsRead(),
                   tooltip: 'Mark all as read',
                 );
               }
@@ -27,26 +29,19 @@ class NotificationPage extends StatelessWidget {
         ],
       ),
       body: Consumer<NotificationProvider>(
-        builder: (context, notificationProvider, child) {
-          final notifications = notificationProvider.notifications;
+        builder: (context, p, child) {
+          final notifications = p.notifications;
 
           if (notifications.isEmpty) {
             return const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.notifications_none,
-                    size: 64,
-                    color: Colors.grey,
-                  ),
+                  Icon(Icons.notifications_none, size: 64, color: Colors.grey),
                   SizedBox(height: 16),
                   Text(
                     'No notifications yet',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.grey,
-                    ),
+                    style: TextStyle(fontSize: 18, color: Colors.grey),
                   ),
                 ],
               ),
@@ -56,10 +51,10 @@ class NotificationPage extends StatelessWidget {
           return ListView.builder(
             itemCount: notifications.length,
             itemBuilder: (context, index) {
-              final notification = notifications[index];
-              return NotificationItem(
-                notification: notification,
-                onTap: () => _handleNotificationTap(context, notification),
+              final n = notifications[index]; // Map<String, dynamic>
+              return _NotificationItem(
+                data: n,
+                onTap: () => _handleTap(context, n),
               );
             },
           );
@@ -68,58 +63,63 @@ class NotificationPage extends StatelessWidget {
     );
   }
 
-  void _handleNotificationTap(BuildContext context, app_notification.Notification notification) {
-    // Mark notification as read
-    final notificationProvider = Provider.of<NotificationProvider>(context, listen: false);
-    notificationProvider.markAsRead(notification.id);
+  Future<void> _handleTap(BuildContext context, Map<String, dynamic> n) async {
+    final p = Provider.of<NotificationProvider>(context, listen: false);
 
-    // Navigate to the appropriate page based on notification type
-    switch (notification.type) {
-      case app_notification.NotificationType.taskDeadline:
-      case app_notification.NotificationType.taskAssignment:
-      case app_notification.NotificationType.taskCreated:
-        // Navigate to task details page
-        // _navigateToTaskDetails(context, notification);
-        break;
-      case app_notification.NotificationType.groupJoin:
-      case app_notification.NotificationType.groupCreated:
-        // Navigate to group details page
-        // _navigateToGroupDetails(context, notification);
-        break;
-      default:
-        // Handle other notification types
-        break;
+    final id = (n['id'] ?? '').toString();
+    if (id.isNotEmpty) {
+      await p.markAsRead(id);
+    }
+
+    // kalau ada groupId, buka group detail
+    final groupId = (n['groupId'] ?? '').toString();
+    if (groupId.isNotEmpty) {
+      if (!context.mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => GroupDetailPage(groupId: groupId)),
+      );
     }
   }
 }
 
-class NotificationItem extends StatelessWidget {
-  final app_notification.Notification notification;
+class _NotificationItem extends StatelessWidget {
+  final Map<String, dynamic> data;
   final VoidCallback? onTap;
 
-  const NotificationItem({
-    super.key,
-    required this.notification,
-    this.onTap,
-  });
+  const _NotificationItem({required this.data, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final isUnread = !notification.isRead;
     final theme = Theme.of(context);
+
+    final title = (data['title'] ?? '-').toString();
+    final message = (data['message'] ?? '').toString();
+    final type = (data['type'] ?? 'general').toString();
+
+    final isReadVal = data['isRead'];
+    final isRead = isReadVal is bool ? isReadVal : false;
+    final isUnread = !isRead;
+
+    DateTime createdAt = DateTime.now();
+    final ca = data['createdAt'];
+    if (ca is Timestamp) createdAt = ca.toDate();
+    if (ca is DateTime) createdAt = ca;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       elevation: isUnread ? 4 : 2,
-      color: isUnread ? theme.cardColor.withValues(alpha: 0.9) : theme.cardColor,
+      color: isUnread
+          ? theme.cardColor.withValues(alpha: 0.95)
+          : theme.cardColor,
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: _getNotificationIcon(notification.type),
+        leading: _iconByType(type),
         title: Row(
           children: [
             Expanded(
               child: Text(
-                notification.title,
+                title,
                 style: TextStyle(
                   fontWeight: isUnread ? FontWeight.bold : FontWeight.normal,
                   fontSize: 16,
@@ -127,18 +127,15 @@ class NotificationItem extends StatelessWidget {
               ),
             ),
             Text(
-              _formatTime(notification.createdAt),
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
-              ),
+              _formatTime(createdAt),
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
             ),
           ],
         ),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 4),
           child: Text(
-            notification.message,
+            message,
             style: TextStyle(
               color: isUnread ? Colors.black87 : Colors.grey[700],
             ),
@@ -159,32 +156,38 @@ class NotificationItem extends StatelessWidget {
     );
   }
 
-  Widget _getNotificationIcon(app_notification.NotificationType type) {
+  Widget _iconByType(String type) {
+    // mapping string -> icon
     IconData icon;
     Color color;
 
     switch (type) {
-      case app_notification.NotificationType.groupJoin:
-      case app_notification.NotificationType.groupCreated:
+      case 'groupJoin':
+      case 'groupCreated':
         icon = Icons.group;
         color = Colors.blue;
         break;
-      case app_notification.NotificationType.taskDeadline:
+
+      case 'taskDeadline':
         icon = Icons.access_time;
         color = Colors.orange;
         break;
-      case app_notification.NotificationType.taskAssignment:
+
+      case 'taskAssignment':
         icon = Icons.assignment;
         color = Colors.green;
         break;
-      case app_notification.NotificationType.taskUpdate:
+
+      case 'taskUpdate':
         icon = Icons.update;
         color = Colors.purple;
         break;
-      case app_notification.NotificationType.taskCreated:
+
+      case 'taskCreated':
         icon = Icons.add_task;
         color = Colors.teal;
         break;
+
       default:
         icon = Icons.notifications;
         color = Colors.grey;
@@ -196,26 +199,17 @@ class NotificationItem extends StatelessWidget {
         shape: BoxShape.circle,
         color: color.withValues(alpha: 0.1),
       ),
-      child: Icon(
-        icon,
-        color: color,
-        size: 20,
-      ),
+      child: Icon(icon, color: color, size: 20),
     );
   }
 
   String _formatTime(DateTime dateTime) {
     final now = DateTime.now();
-    final difference = now.difference(dateTime);
+    final diff = now.difference(dateTime);
 
-    if (difference.inDays > 0) {
-      return '${difference.inDays}d ago';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours}h ago';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes}m ago';
-    } else {
-      return 'Just now';
-    }
+    if (diff.inDays > 0) return '${diff.inDays}d ago';
+    if (diff.inHours > 0) return '${diff.inHours}h ago';
+    if (diff.inMinutes > 0) return '${diff.inMinutes}m ago';
+    return 'Just now';
   }
 }

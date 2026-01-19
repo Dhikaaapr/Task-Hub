@@ -1,183 +1,127 @@
+// lib/models/notification.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+/// NOTE:
+/// Nama file ini "notification.dart" aman, tapi class-nya jangan pakai nama "Notification"
+/// biar tidak bentrok dengan Flutter Notification.
+/// Kita pakai AppNotification.
 
 enum NotificationType {
-  groupJoin,
   taskDeadline,
   taskAssignment,
-  taskUpdate,
-  groupCreated,
   taskCreated,
-  other
+  taskUpdate,
+  groupJoin,
+  groupCreated,
+  other,
 }
 
-class Notification {
+NotificationType notificationTypeFromString(String? s) {
+  if (s == null) return NotificationType.other;
+  switch (s) {
+    case 'taskDeadline':
+      return NotificationType.taskDeadline;
+    case 'taskAssignment':
+      return NotificationType.taskAssignment;
+    case 'taskCreated':
+      return NotificationType.taskCreated;
+    case 'taskUpdate':
+      return NotificationType.taskUpdate;
+    case 'groupJoin':
+      return NotificationType.groupJoin;
+    case 'groupCreated':
+      return NotificationType.groupCreated;
+    default:
+      return NotificationType.other;
+  }
+}
+
+String notificationTypeToString(NotificationType t) {
+  // penting: konsisten dengan yang disimpan di FirestoreService (_createUserNotification)
+  return t.name; // Dart >= 2.15
+}
+
+class AppNotification {
   final String id;
-  final String userId;
+
+  final NotificationType type;
   final String title;
   final String message;
-  final NotificationType type;
-  final Map<String, dynamic>? data;
+
   final bool isRead;
   final DateTime createdAt;
-  final DateTime? updatedAt;
 
-  Notification({
+  /// Optional: untuk deep link ke halaman tertentu
+  final String? groupId;
+  final String? taskId;
+
+  const AppNotification({
     required this.id,
-    required this.userId,
+    required this.type,
     required this.title,
     required this.message,
-    required this.type,
-    this.data,
-    this.isRead = false,
+    required this.isRead,
     required this.createdAt,
-    this.updatedAt,
+    this.groupId,
+    this.taskId,
   });
 
-  // Convert Notification to Map
+  /// Dari Map firestore -> model
+  factory AppNotification.fromMap(String id, Map<String, dynamic> data) {
+    final created = data['createdAt'];
+
+    DateTime createdAt;
+    if (created is Timestamp) {
+      createdAt = created.toDate();
+    } else if (created is DateTime) {
+      createdAt = created;
+    } else {
+      createdAt = DateTime.now();
+    }
+
+    return AppNotification(
+      id: id,
+      type: notificationTypeFromString(data['type']?.toString()),
+      title: (data['title'] ?? '').toString(),
+      message: (data['message'] ?? '').toString(),
+      isRead: (data['isRead'] ?? false) == true,
+      createdAt: createdAt,
+      groupId: data['groupId']?.toString(),
+      taskId: data['taskId']?.toString(),
+    );
+  }
+
+  /// Model -> Map firestore
   Map<String, dynamic> toMap() {
     return {
-      'id': id,
-      'userId': userId,
+      'type': notificationTypeToString(type),
       'title': title,
       'message': message,
-      'type': type.toString().split('.').last,
-      'data': data,
       'isRead': isRead,
-      'createdAt': createdAt.toIso8601String(),
-      'updatedAt': updatedAt?.toIso8601String(),
+      'createdAt': Timestamp.fromDate(createdAt),
+      if (groupId != null) 'groupId': groupId,
+      if (taskId != null) 'taskId': taskId,
     };
   }
 
-  // Create Notification from Map
-  factory Notification.fromMap(Map<String, dynamic> map) {
-    return Notification(
-      id: map['id']?.toString() ?? '',
-      userId: map['user_id']?.toString() ?? map['userId']?.toString() ?? '',
-      title: map['title'] ?? '',
-      message: map['message'] ?? '',
-      type: _parseNotificationType(map['type'] ?? 'other'),
-      data: map['data'] != null ? Map<String, dynamic>.from(map['data']) : null,
-      isRead: map['is_read'] ?? map['isRead'] ?? false,
-      createdAt: DateTime.parse(map['created_at'] ?? map['createdAt'] ?? DateTime.now().toIso8601String()),
-      updatedAt: map['updated_at'] != null 
-          ? DateTime.parse(map['updated_at']) 
-          : (map['updatedAt'] != null ? DateTime.parse(map['updatedAt']) : null),
-    );
-  }
-
-  // Create Notification from JSON
-  factory Notification.fromJson(Map<String, dynamic> json) => Notification.fromMap(json);
-
-  // Convert Notification to JSON
-  Map<String, dynamic> toJson() => toMap();
-
-  Notification copyWith({
-    String? id,
-    String? userId,
+  AppNotification copyWith({
+    NotificationType? type,
     String? title,
     String? message,
-    NotificationType? type,
-    Map<String, dynamic>? data,
     bool? isRead,
     DateTime? createdAt,
-    DateTime? updatedAt,
+    String? groupId,
+    String? taskId,
   }) {
-    return Notification(
-      id: id ?? this.id,
-      userId: userId ?? this.userId,
+    return AppNotification(
+      id: id,
+      type: type ?? this.type,
       title: title ?? this.title,
       message: message ?? this.message,
-      type: type ?? this.type,
-      data: data ?? this.data,
       isRead: isRead ?? this.isRead,
       createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
-    );
-  }
-
-  // Helper method to parse notification type from string
-  static NotificationType _parseNotificationType(String type) {
-    switch (type) {
-      case 'groupJoin':
-      case 'group_join':
-        return NotificationType.groupJoin;
-      case 'taskDeadline':
-      case 'task_deadline':
-        return NotificationType.taskDeadline;
-      case 'taskAssignment':
-      case 'task_assignment':
-        return NotificationType.taskAssignment;
-      case 'taskUpdate':
-      case 'task_update':
-        return NotificationType.taskUpdate;
-      case 'groupCreated':
-      case 'group_created':
-        return NotificationType.groupCreated;
-      case 'taskCreated':
-      case 'task_created':
-        return NotificationType.taskCreated;
-      default:
-        return NotificationType.other;
-    }
-  }
-}
-
-// Notification data classes for different types
-class GroupNotificationData {
-  final String groupId;
-  final String groupName;
-
-  GroupNotificationData({
-    required this.groupId,
-    required this.groupName,
-  });
-
-  Map<String, dynamic> toMap() {
-    return {
-      'groupId': groupId,
-      'groupName': groupName,
-    };
-  }
-
-  factory GroupNotificationData.fromMap(Map<String, dynamic> map) {
-    return GroupNotificationData(
-      groupId: map['groupId'] ?? '',
-      groupName: map['groupName'] ?? '',
-    );
-  }
-}
-
-class TaskNotificationData {
-  final String taskId;
-  final String taskTitle;
-  final String groupId;
-  final String groupName;
-  final DateTime? dueDate;
-
-  TaskNotificationData({
-    required this.taskId,
-    required this.taskTitle,
-    required this.groupId,
-    required this.groupName,
-    this.dueDate,
-  });
-
-  Map<String, dynamic> toMap() {
-    return {
-      'taskId': taskId,
-      'taskTitle': taskTitle,
-      'groupId': groupId,
-      'groupName': groupName,
-      'dueDate': dueDate?.toIso8601String(),
-    };
-  }
-
-  factory TaskNotificationData.fromMap(Map<String, dynamic> map) {
-    return TaskNotificationData(
-      taskId: map['taskId'] ?? '',
-      taskTitle: map['taskTitle'] ?? '',
-      groupId: map['groupId'] ?? '',
-      groupName: map['groupName'] ?? '',
-      dueDate: map['dueDate'] != null ? DateTime.parse(map['dueDate']) : null,
+      groupId: groupId ?? this.groupId,
+      taskId: taskId ?? this.taskId,
     );
   }
 }

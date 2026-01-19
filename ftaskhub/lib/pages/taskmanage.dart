@@ -1,160 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../services/firestore_service.dart';
+import '../utils/navigation_helper.dart';
+
 import 'create_task_page.dart';
-import '../models/task_hub_service.dart';
-import '../models/task.dart';
-import '../models/group.dart';
-import '../pages/group_detail_page.dart';
-import '../pages/create_group_new.dart'; // Import the new create group page
-import '../models/user.dart';
+import 'create_group_page.dart';
 
 const Color primaryBlue = Color(0xFF0A2E5C);
-
-class TaskItem {
-  final String personName;
-  final String role;
-  final String subtitle1;
-  final String subtitle2;
-  final String dayLabel;
-  final String dateNumber;
-  final String monthYear;
-
-  TaskItem({
-    required this.personName,
-    required this.role,
-    required this.subtitle1,
-    required this.subtitle2,
-    required this.dayLabel,
-    required this.dateNumber,
-    required this.monthYear,
-  });
-}
-
-// dummy data untuk awal
-List<TaskItem> dummyTasks = [
-  TaskItem(
-    personName: 'Andhika Presha Saputra',
-    role: 'UI/UX Design',
-    subtitle1: 'Navigation Bar',
-    subtitle2: 'Profile Menu',
-    dayLabel: 'Monday',
-    dateNumber: '1',
-    monthYear: 'February 2025',
-  ),
-];
-
-/// 🔥 Tempat menyimpan group
-List<Map<String, dynamic>> userGroups = [];
-
-/// function tambah group ke Task List
-void addGroupToTasks(String groupName, List<String> members) {
-  userGroups.add({
-    "groupName": groupName,
-    "members": members,
-    "createdAt": DateTime.now(),
-  });
-}
-
-class TaskCard extends StatelessWidget {
-  final TaskItem task;
-  final bool showShadow;
-
-  const TaskCard({super.key, required this.task, this.showShadow = false});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 6),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: primaryBlue,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: showShadow
-            ? [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.2),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ]
-            : null,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Tanggal Style
-          Container(
-            width: 70,
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(35),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.4),
-                width: 1.2,
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  task.dayLabel,
-                  style: const TextStyle(fontSize: 10, color: Colors.white70),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  task.dateNumber,
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  task.monthYear,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 10, color: Colors.white70),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-
-          // Detail Task
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "${task.personName} Task",
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  task.role,
-                  style: const TextStyle(fontSize: 12, color: Colors.white70),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  "• ${task.subtitle1}",
-                  style: const TextStyle(fontSize: 12, color: Colors.white),
-                ),
-                Text(
-                  "• ${task.subtitle2}",
-                  style: const TextStyle(fontSize: 12, color: Colors.white),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class MustToDoPage extends StatefulWidget {
   const MustToDoPage({super.key});
@@ -164,138 +17,317 @@ class MustToDoPage extends StatefulWidget {
 }
 
 class _MustToDoPageState extends State<MustToDoPage> {
-  final TaskHubService _taskHubService = TaskHubService();
-
-  @override
-  void initState() {
-    super.initState();
-    _taskHubService.initialize();
-  }
+  final FirestoreService _fs = FirestoreService();
 
   @override
   Widget build(BuildContext context) {
-    // Get tasks assigned to current user
-    final userTasks = _taskHubService.getTasksByUser('current_user_id');
-
     return Scaffold(
       backgroundColor: primaryBlue,
       appBar: AppBar(
         title: const Text('All Tasks'),
         backgroundColor: primaryBlue,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.groups),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => GroupDetailPage(
-                  group: Group(
-                    id: 'default_group',
-                    name: 'Sample Group',
-                    description: 'This is a sample group',
-                    memberIds: ['current_user_id'],
-                    creatorId: 'current_user_id',
-                    createdAt: DateTime.now(),
-                  ),
-                  currentUser: User(
-                    id: 'current_user_id',
-                    name: 'Current User',
-                    email: 'user@example.com',
-                  ),
-                )), // Replace with actual group when available
-              );
-            },
-          ),
-        ],
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.orange,
-        child: const Icon(Icons.add),
+        child: const Icon(Icons.add, color: Colors.white),
         onPressed: () async {
-          // Show dialog to choose between creating a task or creating a group
           await showDialog(
             context: context,
-            builder: (BuildContext context) {
-              return AlertDialog(
-                title: const Text("Create New"),
-                content: const Text("What would you like to create?"),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => CreateTaskPage()),
-                      );
-                    },
-                    child: const Text("Task"),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const CreateGroupPageNew()), // Using the new create group page
-                      );
-                    },
-                    child: const Text("Group"),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                    child: const Text("Cancel"),
-                  ),
-                ],
-              );
-            },
+            builder: (_) => AlertDialog(
+              title: const Text("Create New"),
+              content: const Text("What would you like to create?"),
+              actions: [
+                TextButton(
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    await _openCreateTaskPage(); // ✅ FIX: pilih group dulu
+                  },
+                  child: const Text("Task"),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    navigateWithFade(context, const CreateGroupPage());
+                  },
+                  child: const Text("Group"),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Cancel"),
+                ),
+              ],
+            ),
           );
         },
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                "Your Tasks",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
+      body: StreamBuilder<List<Map<String, dynamic>>>(
+        stream: _fs.streamMyAssignedTasks(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return _buildError('${snapshot.error}');
+          }
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return _buildLoading();
+          }
 
-              const SizedBox(height: 10),
+          final tasks = snapshot.data ?? [];
 
-              if (userTasks.isEmpty)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(20),
-                    child: Text(
-                      "No tasks assigned to you",
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ),
-                )
-              else
-                ...userTasks.map(
-                  (task) => _buildTaskCard(task),
-                ),
-            ],
-          ),
-        ),
+          // sort deadline asc
+          tasks.sort((a, b) {
+            final da = _toDateTime(a['deadline']);
+            final db = _toDateTime(b['deadline']);
+            if (da == null && db == null) return 0;
+            if (da == null) return 1;
+            if (db == null) return -1;
+            return da.compareTo(db);
+          });
+
+          // upcoming deadlines (max 5) yang belum done/cancelled
+          final upcoming = tasks
+              .where((t) => (t['status'] ?? 'todo') != 'done')
+              .where((t) => (t['status'] ?? 'todo') != 'cancelled')
+              .where((t) => _toDateTime(t['deadline']) != null)
+              .take(5)
+              .toList();
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                _buildSectionUpcoming(upcoming),
+                const SizedBox(height: 12),
+                _buildSectionTasks(tasks),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildTaskCard(Task task) {
+  // ✅ helper: buka CreateTaskPage (pilih group dulu kalau lebih dari 1)
+  Future<void> _openCreateTaskPage() async {
+    final groups = await _fs.streamMyGroups().first;
+    if (!mounted) return;
+
+    if (groups.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Kamu belum punya group. Buat group dulu.'),
+        ),
+      );
+      navigateWithFade(context, const CreateGroupPage());
+      return;
+    }
+
+    if (groups.length == 1) {
+      final gid = groups.first['id'] as String;
+      navigateWithFade(context, CreateTaskPage(groupId: gid));
+      return;
+    }
+
+    String selectedGroupId = groups.first['id'] as String;
+
+    await showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Pilih Group'),
+          content: DropdownButtonFormField<String>(
+            initialValue: selectedGroupId,
+            decoration: const InputDecoration(
+              labelText: 'Group',
+              border: OutlineInputBorder(),
+            ),
+            items: groups.map((g) {
+              return DropdownMenuItem(
+                value: g['id'] as String,
+                child: Text((g['name'] ?? 'Unnamed') as String),
+              );
+            }).toList(),
+            onChanged: (v) {
+              if (v == null) return;
+              selectedGroupId = v;
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0A2E5C),
+              ),
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                if (!mounted) return;
+                navigateWithFade(
+                  context,
+                  CreateTaskPage(groupId: selectedGroupId),
+                );
+              },
+              child: const Text('Lanjut'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // =========================
+  // UI SECTIONS
+  // =========================
+
+  Widget _buildSectionUpcoming(List<Map<String, dynamic>> tasks) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Upcoming Deadlines",
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+          const SizedBox(height: 10),
+          if (tasks.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text(
+                "Tidak ada deadline dekat.",
+                style: TextStyle(color: Colors.grey),
+              ),
+            )
+          else
+            Column(
+              children: tasks.map((t) {
+                final title = (t['title'] ?? '-') as String;
+                final d = _toDateTime(t['deadline']);
+                final status = (t['status'] ?? 'todo') as String;
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey[300]!),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.event, size: 18, color: primaryBlue),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              d == null ? '-' : 'Due: ${_formatDateTime(d)}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _statusColor(status).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          status,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                            color: _statusColor(status),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionTasks(List<Map<String, dynamic>> tasks) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Your Tasks",
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+          const SizedBox(height: 10),
+          if (tasks.isEmpty)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(20),
+                child: Text(
+                  "No tasks assigned to you",
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+            )
+          else
+            Column(children: tasks.map((t) => _buildTaskCard(t)).toList()),
+        ],
+      ),
+    );
+  }
+
+  // =========================
+  // TASK CARD (Firestore)
+  // =========================
+
+  Widget _buildTaskCard(Map<String, dynamic> t) {
+    final id = (t['id'] ?? '') as String;
+    final title = (t['title'] ?? '-') as String;
+    final desc = (t['description'] ?? '') as String;
+
+    final status = (t['status'] ?? 'todo') as String;
+    final progress = _toInt(t['progress']);
+
+    final deadline = _toDateTime(t['deadline']);
+    final groupId = (t['groupId'] ?? '') as String;
+
+    final isDone = status == 'done';
+
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6),
       padding: const EdgeInsets.all(12),
@@ -304,7 +336,7 @@ class _MustToDoPageState extends State<MustToDoPage> {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
+            color: Colors.black.withValues(alpha: 0.20),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -313,9 +345,9 @@ class _MustToDoPageState extends State<MustToDoPage> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Progress indicator
+          // progress bubble
           Container(
-            width: 70,
+            width: 78,
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.08),
@@ -329,22 +361,43 @@ class _MustToDoPageState extends State<MustToDoPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  "${task.progress}%",
+                  "$progress%",
                   style: const TextStyle(
-                    fontSize: 10,
+                    fontSize: 11,
                     color: Colors.white70,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 SizedBox(
-                  width: 24,
-                  height: 24,
+                  width: 26,
+                  height: 26,
                   child: CircularProgressIndicator(
-                    value: task.progress / 100,
+                    value: (progress.clamp(0, 100)) / 100,
                     strokeWidth: 3,
                     backgroundColor: Colors.white30,
-                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _statusColor(status).withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    status,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: _statusColor(status),
+                    ),
                   ),
                 ),
               ],
@@ -352,36 +405,69 @@ class _MustToDoPageState extends State<MustToDoPage> {
           ),
           const SizedBox(width: 12),
 
-          // Detail Task
+          // detail
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  task.title,
+                  title,
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  task.status.toString().split('.').last,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.white70,
+                const SizedBox(height: 6),
+                if (desc.trim().isNotEmpty)
+                  Text(
+                    desc,
+                    style: const TextStyle(fontSize: 12, color: Colors.white),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  "• ${task.description}",
-                  style: const TextStyle(fontSize: 12, color: Colors.white),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  "Group: ${task.groupId}", // This should be the group name, but for now using ID
-                  style: TextStyle(fontSize: 11, color: Colors.white70),
+                const SizedBox(height: 6),
+                if (deadline != null)
+                  Text(
+                    "Deadline: ${_formatDateTime(deadline)}",
+                    style: const TextStyle(fontSize: 11, color: Colors.white70),
+                  ),
+                if (groupId.trim().isNotEmpty)
+                  Text(
+                    "GroupId: $groupId",
+                    style: const TextStyle(fontSize: 11, color: Colors.white70),
+                  ),
+                const SizedBox(height: 10),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isDone
+                              ? Colors.green
+                              : Colors.orange,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        icon: Icon(
+                          isDone ? Icons.check_circle : Icons.done_all,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                        label: Text(
+                          isDone ? "Completed" : "Mark Done",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        onPressed: isDone
+                            ? null
+                            : () async => _markTaskDone(id),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -390,5 +476,84 @@ class _MustToDoPageState extends State<MustToDoPage> {
       ),
     );
   }
-}
 
+  Future<void> _markTaskDone(String taskId) async {
+    try {
+      await _fs.updateTask(
+        taskId: taskId,
+        data: {
+          'status': 'done',
+          'progress': 100,
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Task selesai ✅')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Gagal update task: $e')));
+    }
+  }
+
+  // =========================
+  // SMALL HELPERS
+  // =========================
+
+  Widget _buildLoading() {
+    return const Center(child: CircularProgressIndicator(color: Colors.white));
+  }
+
+  Widget _buildError(String msg) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Text(
+          'Gagal memuat tasks:\n$msg',
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.white70),
+        ),
+      ),
+    );
+  }
+
+  int _toInt(dynamic v) {
+    if (v is int) return v;
+    if (v is double) return v.round();
+    return 0;
+  }
+
+  DateTime? _toDateTime(dynamic v) {
+    if (v is Timestamp) return v.toDate();
+    if (v is DateTime) return v;
+    return null;
+  }
+
+  String _formatDateTime(DateTime d) {
+    final dd = d.day.toString().padLeft(2, '0');
+    final mm = d.month.toString().padLeft(2, '0');
+    final yy = d.year.toString();
+    final hh = d.hour.toString().padLeft(2, '0');
+    final mi = d.minute.toString().padLeft(2, '0');
+    return "$dd/$mm/$yy $hh:$mi";
+  }
+
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'todo':
+        return Colors.grey;
+      case 'inProgress':
+        return Colors.orange;
+      case 'done':
+        return Colors.green;
+      case 'cancelled':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+}

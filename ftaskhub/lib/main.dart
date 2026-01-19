@@ -1,35 +1,46 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_taskhub/services/notification_provider.dart';
+
 import 'auth/login_page.dart';
+import 'services/firestore_service.dart';
+import 'services/notification_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-  runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => NotificationProvider()),
-      ],
-      child: const MyApp(),
-    ),
-  );
+  runApp(const MyApp());
 }
-
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'TaskHub',
-      theme: ThemeData(
-        primaryColor: const Color(0xFF0A2E5C),
+    return MultiProvider(
+      providers: [
+        // 🔹 FirestoreService (singleton app-wide)
+        Provider<FirestoreService>(create: (_) => FirestoreService()),
+
+        // 🔔 NotificationProvider (realtime notifications)
+        ChangeNotifierProvider<NotificationProvider>(
+          create: (ctx) {
+            final fs = ctx.read<FirestoreService>();
+            final provider = NotificationProvider(fs);
+            provider.start(); // ⬅️ WAJIB: mulai stream Firestore
+            return provider;
+          },
+        ),
+      ],
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: 'TaskHub',
+        theme: ThemeData(
+          primaryColor: const Color(0xFF0A2E5C),
+          scaffoldBackgroundColor: Colors.white,
+        ),
+        home: const LoginPage(),
       ),
-      home: const LoginPage(),
     );
   }
 }

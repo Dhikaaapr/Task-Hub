@@ -1,13 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../utils/navigation_helper.dart';
-import 'create_group_page.dart';
 import '../auth/login_page.dart';
-import 'groups_page.dart'; // Import the new groups page
-import 'calendar_integration_page.dart';
-import 'video_conference_page.dart'; // Import video conference page
-import '../models/task_hub_service.dart';
-import '../models/group.dart';
-import '../models/task.dart'; // Import Task model to use TaskStatus
+import 'create_group_page.dart';
+import 'groups_page.dart';
+import 'video_conference_page.dart';
+import 'create_task_page.dart';
+import 'taskmanage.dart';
+import 'notification_page.dart';
+
+import '../services/firestore_service.dart';
+
+// ✅ widgets utils
+import '../widgets/dashboard_header.dart';
+import '../widgets/dashboard_bottom_nav.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -18,29 +27,46 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   final Color primaryBlue = const Color(0xFF0A2E5C);
-  final TaskHubService _taskHubService = TaskHubService();
+  final FirestoreService _fs = FirestoreService();
+
   int _selectedIndex = 0;
 
-  @override
-  void initState() {
-    super.initState();
-    _taskHubService.initialize();
+  User? get _user => FirebaseAuth.instance.currentUser;
+
+  String get _displayName {
+    final name = _user?.displayName;
+    if (name != null && name.trim().isNotEmpty) return name;
+
+    final email = _user?.email ?? '';
+    if (email.isNotEmpty) return email.split('@').first;
+
+    return 'User';
+  }
+
+  String get _subtitle => _user?.email ?? '';
+
+  ImageProvider _profileImageProvider() {
+    final url = _user?.photoURL;
+    if (url != null && url.isNotEmpty) return NetworkImage(url);
+    return const AssetImage('assets/profile.jpg');
   }
 
   void _onItemTapped(int index) {
     setState(() => _selectedIndex = index);
+
     switch (index) {
       case 0:
-        navigateWithFade(context, const GroupsPage()); // Navigate to groups page
+        navigateWithFade(context, const GroupsPage());
         break;
       case 1:
         _joinVideoConference();
         break;
       case 2:
-        navigateWithFade(context, const CreateGroupPage());
+        _showCreateBottomSheet();
         break;
       case 3:
-        navigateWithFade(context, const GroupsPage()); // Navigate to groups page
+        // kamu bisa ganti ini ke Task Manage juga kalau mau
+        navigateWithFade(context, const MustToDoPage());
         break;
       case 4:
         _showSettingsBottomSheet();
@@ -48,36 +74,133 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
+  Future<void> _logout() async {
+    await GoogleSignIn().signOut();
+    await FirebaseAuth.instance.signOut();
+
+    if (!mounted) return;
+    navigateReplacementWithFade(context, const LoginPage());
+  }
+
+  Future<bool> _ensureHasGroupOrGoCreate() async {
+    final groups = await _fs.streamMyGroups().first;
+
+    if (!mounted) return false;
+
+    if (groups.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Kamu belum punya group. Buat group dulu ya.'),
+        ),
+      );
+      navigateWithFade(context, const CreateGroupPage());
+      return false;
+    }
+
+    return true;
+  }
+
+  // ✅ helper: buka CreateTaskPage (pilih group dulu kalau lebih dari 1)
+  Future<void> _openCreateTaskPage() async {
+    final groups = await _fs.streamMyGroups().first;
+    if (!mounted) return;
+
+    if (groups.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Kamu belum punya group. Buat group dulu ya.'),
+        ),
+      );
+      navigateWithFade(context, const CreateGroupPage());
+      return;
+    }
+
+    if (groups.length == 1) {
+      final gid = groups.first['id'] as String;
+      navigateWithFade(context, CreateTaskPage(groupId: gid));
+      return;
+    }
+
+    String selectedGroupId = groups.first['id'] as String;
+
+    await showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Pilih Group'),
+          content: DropdownButtonFormField<String>(
+            initialValue: selectedGroupId,
+            decoration: const InputDecoration(
+              labelText: 'Group',
+              border: OutlineInputBorder(),
+            ),
+            items: groups.map((g) {
+              return DropdownMenuItem(
+                value: g['id'] as String,
+                child: Text((g['name'] ?? 'Unnamed') as String),
+              );
+            }).toList(),
+            onChanged: (v) {
+              if (v == null) return;
+              selectedGroupId = v;
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0A2E5C),
+              ),
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                if (!mounted) return;
+                navigateWithFade(
+                  context,
+                  CreateTaskPage(groupId: selectedGroupId),
+                );
+              },
+              child: const Text('Lanjut'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ==========================
+  // VIDEO CONF
+  // ==========================
   void _joinVideoConference() {
-    // In a real app, this would integrate with a video conference service like Jitsi, Zoom, etc.
-    // For now, we'll show a simple alert
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text("Join Video Conference"),
+          title: const Text('Join Video Conference'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("Select a meeting to join:"),
+              const Text('Select a meeting to join:'),
               const SizedBox(height: 16),
               ListTile(
                 leading: const Icon(Icons.video_call),
-                title: const Text("Team Standup"),
-                subtitle: const Text("Today, 10:00 AM"),
+                title: const Text('Team Standup'),
+                subtitle: const Text('Today, 10:00 AM'),
                 onTap: () {
                   Navigator.of(context).pop();
-                  _launchVideoConference("standup_meeting");
+                  _launchVideoConference('standup_meeting');
                 },
               ),
               ListTile(
                 leading: const Icon(Icons.video_call),
-                title: const Text("Project Review"),
-                subtitle: const Text("Today, 2:00 PM"),
+                title: const Text('Project Review'),
+                subtitle: const Text('Today, 2:00 PM'),
                 onTap: () {
                   Navigator.of(context).pop();
-                  _launchVideoConference("review_meeting");
+                  _launchVideoConference('review_meeting');
                 },
               ),
             ],
@@ -85,7 +208,7 @@ class _DashboardPageState extends State<DashboardPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text("Cancel"),
+              child: const Text('Cancel'),
             ),
           ],
         );
@@ -94,20 +217,74 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _launchVideoConference(String meetingId) {
-    // Navigate to the video conference page
-    Navigator.of(context).pop(); // Close the dialog first
-
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => VideoConferencePage(
           meetingId: meetingId,
-          meetingName: meetingId == "standup_meeting" ? "Team Standup" : "Project Review",
+          meetingName: meetingId == 'standup_meeting'
+              ? 'Team Standup'
+              : 'Project Review',
         ),
       ),
     );
   }
 
+  // ==========================
+  // CREATE: GROUP / TASK
+  // ==========================
+  void _showCreateBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(16),
+        height: 220,
+        child: Column(
+          children: [
+            Container(
+              width: 50,
+              height: 5,
+              decoration: BoxDecoration(
+                color: Colors.grey[400],
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            const SizedBox(height: 20),
+            ListTile(
+              leading: const Icon(Icons.groups, color: Color(0xFF0A2E5C)),
+              title: const Text('Create Group'),
+              subtitle: const Text('Buat kelompok baru'),
+              onTap: () {
+                Navigator.pop(context);
+                navigateWithFade(context, const CreateGroupPage());
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.add_task, color: Color(0xFF0A2E5C)),
+              title: const Text('Create Task'),
+              subtitle: const Text('Buat tugas untuk anggota kelompok'),
+              onTap: () async {
+                Navigator.pop(context);
+
+                final hasGroup = await _ensureHasGroupOrGoCreate();
+                if (!hasGroup) return;
+
+                await _openCreateTaskPage();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ==========================
+  // UI
+  // ==========================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -115,69 +292,28 @@ class _DashboardPageState extends State<DashboardPage> {
       body: SafeArea(
         child: Column(
           children: [
-            // Header profile
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => _showProfileOptions(context),
-                    child: const CircleAvatar(
-                      radius: 25,
-                      backgroundImage: AssetImage('assets/profile.jpg'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          "Andhika Presha Saputra",
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        Text(
-                          "Paramadina University",
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.7),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.notifications, color: Colors.white),
-                    onPressed: () {},
-                  ),
-                ],
-              ),
-            ),
+            DashboardHeader(
+              displayName: _displayName,
+              subtitle: _subtitle,
+              profileImage: _profileImageProvider(),
+              onTapProfile: () => _showProfileOptions(context),
 
-            // Content
+              // ✅ badge ambil dari firestore (dashboard_header.dart butuh streamUnreadNotificationCount)
+              firestoreService: _fs,
+
+              // ✅ buka halaman notifikasi
+              onTapNotifications: () =>
+                  navigateWithFade(context, const NotificationPage()),
+            ),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.only(bottom: 16),
                 child: Column(
                   children: [
-                    // Quick Stats Cards
-                    _buildStatsCards(),
-
-                    // Quick Actions
+                    _buildStatsCardsFirestore(),
                     _buildQuickActions(),
-
-                    // Groups Preview
-                    _buildGroupsPreview(),
-
-                    // Recent Tasks
-                    _buildRecentTasks(),
-
-                    // Calendar Preview
+                    _buildGroupsPreviewFirestore(),
+                    _buildRecentTasksFirestore(),
                     _buildCalendarPreview(),
                   ],
                 ),
@@ -186,97 +322,64 @@ class _DashboardPageState extends State<DashboardPage> {
           ],
         ),
       ),
-
-      // Bottom Navigation
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: primaryBlue,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.2),
-              blurRadius: 6,
-              offset: const Offset(0, -3),
-            ),
-          ],
-        ),
-        child: BottomNavigationBar(
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: primaryBlue,
-          selectedItemColor: Colors.white,
-          unselectedItemColor: Colors.white54,
-          currentIndex: _selectedIndex,
-          onTap: _onItemTapped,
-          selectedFontSize: 12,
-          unselectedFontSize: 12,
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.groups),
-              label: 'GROUPS',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.video_call),
-              label: 'MEET',
-            ),
-            BottomNavigationBarItem(
-              icon: CircleAvatar(
-                radius: 18,
-                backgroundColor: Colors.white,
-                child: Icon(Icons.add, color: Color(0xFF0A2E5C)),
-              ),
-              label: 'CREATE',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.groups),
-              label: 'GROUPS',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.settings_outlined),
-              label: 'MORE',
-            ),
-          ],
-        ),
+      bottomNavigationBar: DashboardBottomNav(
+        primaryBlue: primaryBlue,
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
       ),
     );
   }
 
-  Widget _buildStatsCards() {
-    // Get all data for stats
-    final groups = _taskHubService.getGroups();
-    final tasks = _taskHubService.getTasksByUser('current_user_id');
-    final completedTasks = tasks.where((task) => task.status == TaskStatus.done).length;
+  // ==========================
+  // STATS (FIRESTORE)
+  // ==========================
+  Widget _buildStatsCardsFirestore() {
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: _fs.streamMyGroups(),
+      builder: (context, groupSnap) {
+        return StreamBuilder<List<Map<String, dynamic>>>(
+          stream: _fs.streamMyAssignedTasks(),
+          builder: (context, taskSnap) {
+            final groups = groupSnap.data ?? [];
+            final tasks = taskSnap.data ?? [];
+            final doneCount = tasks.where((t) => t['status'] == 'done').length;
 
-    return Container(
-      margin: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildStatCard(
-              title: "Groups",
-              value: groups.length.toString(),
-              icon: Icons.groups,
-              color: Colors.blue[600]!,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _buildStatCard(
-              title: "Tasks",
-              value: tasks.length.toString(),
-              icon: Icons.task,
-              color: Colors.orange[600]!,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _buildStatCard(
-              title: "Done",
-              value: completedTasks.toString(),
-              icon: Icons.check_circle,
-              color: Colors.green[600]!,
-            ),
-          ),
-        ],
-      ),
+            return Container(
+              margin: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildStatCard(
+                      title: 'Groups',
+                      value: groups.length.toString(),
+                      icon: Icons.groups,
+                      color: Colors.blue[600]!,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildStatCard(
+                      title: 'Tasks',
+                      value: tasks.length.toString(),
+                      icon: Icons.task,
+                      color: Colors.orange[600]!,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildStatCard(
+                      title: 'Done',
+                      value: doneCount.toString(),
+                      icon: Icons.check_circle,
+                      color: Colors.green[600]!,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -337,6 +440,9 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
+  // ==========================
+  // QUICK ACTIONS
+  // ==========================
   Widget _buildQuickActions() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -349,7 +455,7 @@ class _DashboardPageState extends State<DashboardPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            "Quick Actions",
+            'Quick Actions',
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 16,
@@ -362,39 +468,25 @@ class _DashboardPageState extends State<DashboardPage> {
             children: [
               _buildQuickAction(
                 icon: Icons.add_task,
-                label: "New Task",
+                label: 'New Task',
                 color: Colors.blue[600]!,
-                onTap: () => navigateWithFade(context, const CreateGroupPage()),
+                onTap: () async {
+                  final hasGroup = await _ensureHasGroupOrGoCreate();
+                  if (!hasGroup) return;
+                  await _openCreateTaskPage();
+                },
               ),
               _buildQuickAction(
                 icon: Icons.groups,
-                label: "New Group",
+                label: 'New Group',
                 color: Colors.green[600]!,
-                onTap: () => navigateWithFade(context, const GroupsPage()),
+                onTap: () => navigateWithFade(context, const CreateGroupPage()),
               ),
               _buildQuickAction(
-                icon: Icons.calendar_today,
-                label: "Calendar",
+                icon: Icons.list_alt,
+                label: 'My Tasks',
                 color: Colors.orange[600]!,
-                onTap: () {
-                  final currentUser = _taskHubService.getUserById('current_user_id');
-                  if (currentUser != null) {
-                    final groups = _taskHubService.getGroups();
-                    if (groups.isNotEmpty) {
-                      navigateWithFade(context, CalendarIntegrationPage(group: groups.first));
-                    } else {
-                      final tempGroup = Group(
-                        id: 'dashboard_calendar',
-                        name: 'All Tasks',
-                        description: 'All your tasks across groups',
-                        memberIds: [currentUser.id],
-                        creatorId: currentUser.id,
-                        createdAt: DateTime.now(),
-                      );
-                      navigateWithFade(context, CalendarIntegrationPage(group: tempGroup));
-                    }
-                  }
-                },
+                onTap: () => navigateWithFade(context, const MustToDoPage()),
               ),
             ],
           ),
@@ -421,10 +513,7 @@ class _DashboardPageState extends State<DashboardPage> {
           children: [
             Container(
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color,
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
               child: Icon(icon, color: Colors.white, size: 20),
             ),
             const SizedBox(height: 8),
@@ -442,9 +531,413 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _buildGroupsPreview() {
-    final groups = _taskHubService.getGroups().take(3).toList();
+  // ==========================
+  // GROUPS PREVIEW (FIRESTORE)
+  // ==========================
+  Widget _buildGroupsPreviewFirestore() {
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: _fs.streamMyGroups(),
+      builder: (context, snapshot) {
+        final groups = (snapshot.data ?? []).take(3).toList();
 
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Your Groups',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Color(0xFF0A2E5C),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () =>
+                        navigateWithFade(context, const GroupsPage()),
+                    child: const Text(
+                      'See All',
+                      style: TextStyle(color: Color(0xFF0A2E5C)),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (groups.isEmpty)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text(
+                      'No groups yet. Create your first group!',
+                      style: TextStyle(color: Colors.grey, fontSize: 14),
+                    ),
+                  ),
+                )
+              else
+                Column(
+                  children: groups.map((g) {
+                    final name = (g['name'] ?? 'Unnamed') as String;
+                    final members = (g['memberIds'] is List)
+                        ? (g['memberIds'] as List)
+                        : <dynamic>[];
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[50],
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0A2E5C),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Icon(
+                              Icons.group,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  '${members.length} members',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ==========================
+  // TASK PREVIEW (FIRESTORE) ✅ sort + filter deadline
+  // ==========================
+  Widget _buildRecentTasksFirestore() {
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: _fs.streamMyAssignedTasks(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _simpleCard(
+            title: 'Your Tasks',
+            child: Text(
+              'Gagal memuat tasks:\n${snapshot.error}',
+              style: const TextStyle(color: Colors.red),
+            ),
+          );
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _simpleCard(
+            title: 'Your Tasks',
+            child: const Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final allTasks = snapshot.data ?? [];
+
+        // Sort deadline asc
+        allTasks.sort((a, b) {
+          final da = a['deadline'];
+          final db = b['deadline'];
+
+          DateTime? dta;
+          DateTime? dtb;
+
+          if (da is Timestamp) dta = da.toDate();
+          if (db is Timestamp) dtb = db.toDate();
+
+          if (dta == null && dtb == null) return 0;
+          if (dta == null) return 1;
+          if (dtb == null) return -1;
+          return dta.compareTo(dtb);
+        });
+
+        // ambil 3 task terdekat yang belum done/cancelled
+        final tasks = allTasks
+            .where((t) => (t['status'] ?? 'todo') != 'done')
+            .where((t) => (t['status'] ?? 'todo') != 'cancelled')
+            .take(3)
+            .toList();
+
+        return _simpleCard(
+          title: 'Your Tasks',
+          trailing: TextButton(
+            onPressed: () => navigateWithFade(context, const MustToDoPage()),
+            child: const Text(
+              'See All',
+              style: TextStyle(color: Color(0xFF0A2E5C)),
+            ),
+          ),
+          child: tasks.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    'No tasks assigned to you yet.',
+                    style: TextStyle(color: Colors.grey, fontSize: 14),
+                  ),
+                )
+              : Column(
+                  children: tasks.map((t) {
+                    final title = (t['title'] ?? '-') as String;
+                    final status = (t['status'] ?? 'todo') as String;
+                    final progress = (t['progress'] ?? 0) as int;
+
+                    DateTime? deadline;
+                    final d = t['deadline'];
+                    if (d is Timestamp) deadline = d.toDate();
+
+                    final statusColor = _statusColor(status);
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.06),
+                        border: Border.all(color: statusColor, width: 1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: statusColor,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Icon(
+                              _statusIcon(status),
+                              size: 14,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  title,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (deadline != null)
+                                  Text(
+                                    'Due: ${_formatDate(deadline)}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            '$progress%',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              color: statusColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+        );
+      },
+    );
+  }
+
+  // ==========================
+  // UPCOMING DEADLINES ✅ from Firestore
+  // ==========================
+  Widget _buildCalendarPreview() {
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: _fs.streamMyAssignedTasks(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _simpleCard(
+            title: 'Upcoming Deadlines',
+            child: Text(
+              'Gagal memuat deadlines:\n${snapshot.error}',
+              style: const TextStyle(color: Colors.red),
+            ),
+          );
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _simpleCard(
+            title: 'Upcoming Deadlines',
+            child: const Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final tasks = snapshot.data ?? [];
+        final now = DateTime.now();
+
+        final upcoming = tasks.where((t) {
+          final status = (t['status'] ?? 'todo') as String;
+          if (status == 'done' || status == 'cancelled') return false;
+
+          final d = t['deadline'];
+          if (d is! Timestamp) return false;
+
+          final dt = d.toDate();
+          return !dt.isBefore(now);
+        }).toList();
+
+        upcoming.sort((a, b) {
+          final da = (a['deadline'] as Timestamp).toDate();
+          final db = (b['deadline'] as Timestamp).toDate();
+          return da.compareTo(db);
+        });
+
+        final top = upcoming.take(5).toList();
+
+        return _simpleCard(
+          title: 'Upcoming Deadlines',
+          child: top.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    'Tidak ada deadline terdekat.',
+                    style: TextStyle(color: Colors.grey, fontSize: 14),
+                  ),
+                )
+              : Column(
+                  children: top.map((t) {
+                    final title = (t['title'] ?? '-') as String;
+                    final status = (t['status'] ?? 'todo') as String;
+                    final progress = (t['progress'] ?? 0) as int;
+
+                    final deadline = (t['deadline'] as Timestamp).toDate();
+                    final daysLeft = deadline.difference(now).inDays;
+
+                    final badgeColor = daysLeft <= 1
+                        ? Colors.red
+                        : (daysLeft <= 3 ? Colors.orange : Colors.green);
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[50],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey[200]!),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: badgeColor.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              daysLeft <= 0 ? 'Today' : '${daysLeft}d',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: badgeColor,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  title,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  'Due: ${_formatDate(deadline)} • $status',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            '$progress%',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0A2E5C),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+        );
+      },
+    );
+  }
+
+  // ==========================
+  // SIMPLE CARD helper
+  // ==========================
+  Widget _simpleCard({
+    required String title,
+    Widget? trailing,
+    required Widget child,
+  }) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(16),
@@ -458,312 +951,27 @@ class _DashboardPageState extends State<DashboardPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                "Your Groups",
-                style: TextStyle(
+              Text(
+                title,
+                style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
                   color: Color(0xFF0A2E5C),
                 ),
               ),
-              TextButton(
-                onPressed: () => navigateWithFade(context, const GroupsPage()),
-                child: const Text(
-                  "See All",
-                  style: TextStyle(color: Color(0xFF0A2E5C)),
-                ),
-              ),
+              if (trailing != null) trailing,
             ],
           ),
           const SizedBox(height: 12),
-          if (groups.isEmpty)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(16),
-                child: Text(
-                  "No groups yet. Create your first group!",
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-            )
-          else
-            Column(
-              children: groups.map((group) {
-                final members = _taskHubService.getGroupMembers(group.id);
-                final progress = _taskHubService.getGroupProgress(group.id);
-
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0A2E5C),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Icon(
-                          Icons.group,
-                          color: Colors.white,
-                          size: 18,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              group.name,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              '${members.length} members',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            '${progress.round()}%',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              color: Color(0xFF0A2E5C),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Container(
-                            width: 60,
-                            height: 4,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[300],
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(2),
-                              child: LinearProgressIndicator(
-                                value: progress / 100,
-                                backgroundColor: Colors.grey[200],
-                                valueColor: const AlwaysStoppedAnimation<Color>(
-                                  Color(0xFF0A2E5C),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
+          child,
         ],
       ),
     );
   }
 
-  Widget _buildRecentTasks() {
-    final tasks = _taskHubService.getTasksByUser('current_user_id').take(3).toList();
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "Your Tasks",
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              color: Color(0xFF0A2E5C),
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (tasks.isEmpty)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(16),
-                child: Text(
-                  "No tasks assigned to you yet.",
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-            )
-          else
-            Column(
-              children: tasks.map((task) {
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: _getStatusColor(task.status).withValues(alpha: 0.05),
-                    border: Border.all(
-                      color: _getStatusColor(task.status),
-                      width: 1,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: _getStatusColor(task.status),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Icon(
-                          _getStatusIcon(task.status),
-                          size: 14,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              task.title,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            if (task.dueDate != null)
-                              Text(
-                                'Due: ${_formatDate(task.dueDate!)}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      Text(
-                        '${task.progress}%',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                          color: _getStatusColor(task.status),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCalendarPreview() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "Upcoming Deadlines",
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              color: Color(0xFF0A2E5C),
-            ),
-          ),
-          const SizedBox(height: 12),
-          // Show upcoming tasks in calendar view
-          Container(
-            height: 120,
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Center(
-              child: Text(
-                "Calendar preview would show upcoming tasks",
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: 14,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Color _getStatusColor(TaskStatus status) {
-    switch (status) {
-      case TaskStatus.todo:
-        return Colors.grey;
-      case TaskStatus.inProgress:
-        return Colors.orange;
-      case TaskStatus.done:
-        return Colors.green;
-      case TaskStatus.cancelled:
-        return Colors.red;
-    }
-  }
-
-  IconData _getStatusIcon(TaskStatus status) {
-    switch (status) {
-      case TaskStatus.todo:
-        return Icons.radio_button_unchecked;
-      case TaskStatus.inProgress:
-        return Icons.hourglass_bottom;
-      case TaskStatus.done:
-        return Icons.check_circle;
-      case TaskStatus.cancelled:
-        return Icons.cancel;
-    }
-  }
-
-  String _formatDate(DateTime date) {
-    return "${date.day}/${date.month}/${date.year}";
-  }
-
-
-  // ==== WIDGET LAIN ====
-
+  // ==========================
+  // PROFILE OPTIONS
+  // ==========================
   void _showProfileOptions(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -773,7 +981,7 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
       builder: (context) => Container(
         padding: const EdgeInsets.all(16),
-        height: 200,
+        height: 240,
         child: Column(
           children: [
             Container(
@@ -784,13 +992,22 @@ class _DashboardPageState extends State<DashboardPage> {
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: CircleAvatar(backgroundImage: _profileImageProvider()),
+              title: Text(
+                _displayName,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              subtitle: Text(_subtitle),
+            ),
+            const Divider(),
             ListTile(
               leading: const Icon(Icons.logout, color: Colors.red),
-              title: const Text("Logout", style: TextStyle(color: Colors.red)),
-              onTap: () {
+              title: const Text('Logout', style: TextStyle(color: Colors.red)),
+              onTap: () async {
                 Navigator.pop(context);
-                navigateReplacementWithFade(context, const LoginPage());
+                await _logout();
               },
             ),
           ],
@@ -799,6 +1016,9 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
+  // ==========================
+  // SETTINGS
+  // ==========================
   void _showSettingsBottomSheet() {
     showModalBottomSheet(
       context: context,
@@ -821,25 +1041,28 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
             const SizedBox(height: 20),
             ListTile(
-              leading: const Icon(Icons.account_circle, color: Color(0xFF0A2E5C)),
-              title: const Text("Profile"),
-              onTap: () {
-                Navigator.pop(context);
-              },
+              leading: const Icon(
+                Icons.account_circle,
+                color: Color(0xFF0A2E5C),
+              ),
+              title: const Text('Profile'),
+              onTap: () => Navigator.pop(context),
             ),
             ListTile(
-              leading: const Icon(Icons.notifications, color: Color(0xFF0A2E5C)),
-              title: const Text("Notifications"),
+              leading: const Icon(
+                Icons.notifications,
+                color: Color(0xFF0A2E5C),
+              ),
+              title: const Text('Notifications'),
               onTap: () {
                 Navigator.pop(context);
+                navigateWithFade(context, const NotificationPage());
               },
             ),
             ListTile(
               leading: const Icon(Icons.help_outline, color: Color(0xFF0A2E5C)),
-              title: const Text("Help & Support"),
-              onTap: () {
-                Navigator.pop(context);
-              },
+              title: const Text('Help & Support'),
+              onTap: () => Navigator.pop(context),
             ),
           ],
         ),
@@ -847,4 +1070,40 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
+  // ==========================
+  // STATUS UI
+  // ==========================
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'todo':
+        return Colors.grey;
+      case 'inProgress':
+        return Colors.orange;
+      case 'done':
+        return Colors.green;
+      case 'cancelled':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  IconData _statusIcon(String status) {
+    switch (status) {
+      case 'todo':
+        return Icons.radio_button_unchecked;
+      case 'inProgress':
+        return Icons.hourglass_bottom;
+      case 'done':
+        return Icons.check_circle;
+      case 'cancelled':
+        return Icons.cancel;
+      default:
+        return Icons.radio_button_unchecked;
+    }
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
+  }
 }

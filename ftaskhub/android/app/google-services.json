@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "1033063893602-ckrob72q17eco258n5rjrtusm296ipoo.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.flutter_taskhub",
+            "certificate_hash": "0755fdf4a30ab475df84d6c510bddbf711a285c7"
+          }
+        },
+        {
           "client_id": "1033063893602-kocf1i80q4hh4fha2qtqei5eu5qjqhk5.apps.googleusercontent.com",
           "client_type": 3
         }
@@ -37,6 +45,13 @@
             {
               "client_id": "1033063893602-kocf1i80q4hh4fha2qtqei5eu5qjqhk5.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "1033063893602-5clif3tncuctiuplvo0f2oiad3mpi32q.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.flutterTaskhub"
+              }
             }
           ]
         }
