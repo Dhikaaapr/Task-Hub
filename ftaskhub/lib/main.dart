@@ -24,12 +24,7 @@ class MyApp extends StatelessWidget {
 
         // 🔔 NotificationProvider (realtime notifications)
         ChangeNotifierProvider<NotificationProvider>(
-          create: (ctx) {
-            final fs = ctx.read<FirestoreService>();
-            final provider = NotificationProvider(fs);
-            provider.start(); // ⬅️ WAJIB: mulai stream Firestore
-            return provider;
-          },
+          create: (_) => NotificationProvider(),
         ),
       ],
       child: MaterialApp(

@@ -1,14 +1,16 @@
 import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import '../services/firestore_service.dart';
 
 class NotificationProvider extends ChangeNotifier {
-  final FirestoreService _fs;
-
-  NotificationProvider(this._fs);
+  NotificationProvider() {
+    _init();
+  }
 
   StreamSubscription<List<Map<String, dynamic>>>? _sub;
+  StreamSubscription<User?>? _authSub;
   List<Map<String, dynamic>> _items = [];
 
   List<Map<String, dynamic>> get notifications => _items;
@@ -21,30 +23,53 @@ class NotificationProvider extends ChangeNotifier {
     }).length;
   }
 
-  void start() {
+  void _init() {
+    _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (user != null) {
+        _start(user.uid);
+      } else {
+        _stop();
+      }
+    });
+  }
+
+  void _start(String uid) {
     _sub?.cancel();
-    _sub = _fs.streamMyNotifications(limit: 50).listen((items) {
+    _sub = FirestoreService().streamMyNotifications(limit: 50).listen((items) {
       _items = items;
       notifyListeners();
     });
   }
 
-  void stop() {
+  void _stop() {
     _sub?.cancel();
     _sub = null;
+    _items = [];
+    notifyListeners();
+  }
+
+  void start() {
+    // Deprecated: logic moved to _init()
+  }
+
+  void stop() {
+    // Deprecated: logic handled by _init()
   }
 
   Future<void> markAsRead(String id) async {
-    await _fs.markNotificationAsRead(id);
+     await FirestoreService().markNotificationAsRead(id);
   }
 
   Future<void> markAllAsRead() async {
-    await _fs.markAllNotificationsAsRead();
+    await FirestoreService().markAllNotificationsAsRead();
   }
 
   @override
   void dispose() {
-    stop();
+    _sub?.cancel();
+    _authSub?.cancel();
     super.dispose();
   }
+
+
 }

@@ -298,8 +298,9 @@ class _CreateTaskPageState extends State<CreateTaskPage> {
                         firstDate: now,
                         lastDate: DateTime(now.year + 5),
                       );
-                      if (picked != null)
+                      if (picked != null) {
                         setState(() => _selectedDate = picked);
+                      }
                     },
                   ),
 

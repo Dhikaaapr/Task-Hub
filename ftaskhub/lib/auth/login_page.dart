@@ -70,7 +70,7 @@ class _LoginPageState extends State<LoginPage> {
         );
       }
     } catch (e) {
-      _showError("Login Google gagal");
+      _showError("Login Google gagal: $e");
     } finally {
       if (mounted) setState(() => _loading = false);
     }
