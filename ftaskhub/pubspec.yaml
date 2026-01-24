@@ -26,6 +26,8 @@ dependencies:
   http: ^1.2.0
   logging: ^1.2.0
   supabase_flutter: ^2.6.0
+  jitsi_meet_flutter_sdk: ^11.6.0
+
 
 dev_dependencies:
   flutter_test:

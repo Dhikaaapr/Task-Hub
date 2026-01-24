@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:jitsi_meet_flutter_sdk/jitsi_meet_flutter_sdk.dart';
 
 class VideoConferencePage extends StatefulWidget {
   final String meetingId;
@@ -15,9 +16,27 @@ class VideoConferencePage extends StatefulWidget {
 }
 
 class _VideoConferencePageState extends State<VideoConferencePage> {
-  bool _isMuted = false;
-  bool _isVideoOff = false;
-  bool _isJoined = false;
+  final _jitsiMeetPlugin = JitsiMeet();
+
+  Future<void> _launchMeeting() async {
+    var options = JitsiMeetConferenceOptions(
+      room: widget.meetingId,
+      configOverrides: {
+        "startWithAudioMuted": true,
+        "startWithVideoMuted": true,
+        "subject": widget.meetingName,
+      },
+      featureFlags: {
+        "unsaferoomwarning.enabled": false,
+      },
+      userInfo: JitsiMeetUserInfo(
+        displayName: "TaskHub User",
+        email: "user@taskhub.com",
+      ),
+    );
+
+    await _jitsiMeetPlugin.join(options);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,197 +44,67 @@ class _VideoConferencePageState extends State<VideoConferencePage> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Main video area
+          // Background/Placeholder
           Container(
             width: double.infinity,
             height: double.infinity,
             color: Colors.grey[900],
-            child: _isJoined
-                ? const Center(
-                    child: Icon(
-                      Icons.videocam,
-                      color: Colors.white,
-                      size: 100,
-                    ),
-                  )
-                : const Center(
-                    child: Text(
-                      "Waiting to join meeting...",
-                      style: TextStyle(color: Colors.white, fontSize: 18),
-                    ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.video_camera_front,
+                  color: Colors.white,
+                  size: 100,
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  "Ready to join?",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
                   ),
-          ),
-          
-          // Top bar with meeting info
-          SafeArea(
-            child: Container(
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.video_call, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      widget.meetingName,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "Meeting: ${widget.meetingName}",
+                  style: const TextStyle(color: Colors.grey, fontSize: 16),
+                ),
+                const SizedBox(height: 48),
+                ElevatedButton.icon(
+                  onPressed: _launchMeeting,
+                  icon: const Icon(Icons.video_call),
+                  label: const Text("Launch Meeting"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.info, color: Colors.white),
-                    onPressed: () {
-                      _showMeetingInfo();
-                    },
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  "This will open safe & free Jitsi Meet",
+                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                ),
+              ],
             ),
           ),
-
-          // Bottom controls
+          
+          // Close button
           Positioned(
-            bottom: 30,
-            left: 0,
-            right: 0,
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    // Toggle microphone
-                    _buildControlButton(
-                      icon: _isMuted ? Icons.mic_off : Icons.mic,
-                      color: _isMuted ? Colors.red : Colors.white,
-                      onPressed: () {
-                        setState(() {
-                          _isMuted = !_isMuted;
-                        });
-                      },
-                    ),
-                    
-                    // Join/leave call button
-                    _buildLargeControlButton(
-                      icon: _isJoined ? Icons.call_end : Icons.videocam,
-                      color: _isJoined ? Colors.red : Colors.green,
-                      label: _isJoined ? "Leave" : "Join",
-                      onPressed: () {
-                        setState(() {
-                          _isJoined = !_isJoined;
-                        });
-                      },
-                    ),
-                    
-                    // Toggle video
-                    _buildControlButton(
-                      icon: _isVideoOff ? Icons.videocam_off : Icons.videocam,
-                      color: _isVideoOff ? Colors.red : Colors.white,
-                      onPressed: () {
-                        setState(() {
-                          _isVideoOff = !_isVideoOff;
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ),
+            top: 40,
+            left: 16,
+            child: IconButton(
+              icon: const Icon(Icons.close, color: Colors.white),
+              onPressed: () => Navigator.pop(context),
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildControlButton({
-    required IconData icon,
-    required Color color,
-    required VoidCallback onPressed,
-  }) {
-    return Container(
-      width: 60,
-      height: 60,
-      decoration: BoxDecoration(
-        color: Colors.black54,
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white24),
-      ),
-      child: Center(
-        child: IconButton(
-          icon: Icon(icon, color: color),
-          onPressed: onPressed,
-          padding: EdgeInsets.zero,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLargeControlButton({
-    required IconData icon,
-    required Color color,
-    required String label,
-    required VoidCallback onPressed,
-  }) {
-    return Container(
-      width: 70,
-      height: 70,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-      ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: Colors.white, size: 24),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 10,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showMeetingInfo() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text("Meeting Info"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text("Meeting ID: ${widget.meetingId}"),
-              const SizedBox(height: 8),
-              const Text("Meeting Name: Team Standup"),
-              const SizedBox(height: 8),
-              Text("Participants: ${_isJoined ? "You and 2 others" : "Waiting for participants..."}"),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text("OK"),
-            ),
-          ],
-        );
-      },
     );
   }
 }

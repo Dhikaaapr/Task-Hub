@@ -40,8 +40,8 @@ class DashboardBottomNav extends StatelessWidget {
           BottomNavigationBarItem(icon: Icon(Icons.add), label: 'CREATE'),
 
           BottomNavigationBarItem(
-            icon: Icon(Icons.settings_outlined),
-            label: 'MORE',
+            icon: Icon(Icons.person),
+            label: 'PROFILE',
           ),
         ],
       ),

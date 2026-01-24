@@ -11,6 +11,8 @@ import 'video_conference_page.dart';
 import 'create_task_page.dart';
 import 'taskmanage.dart';
 import 'notification_page.dart';
+import 'profile_page.dart';
+
 
 import '../services/firestore_service.dart';
 
@@ -65,11 +67,7 @@ class _DashboardPageState extends State<DashboardPage> {
         _showCreateBottomSheet();
         break;
       case 3:
-        // kamu bisa ganti ini ke Task Manage juga kalau mau
-        navigateWithFade(context, const MustToDoPage());
-        break;
-      case 4:
-        _showSettingsBottomSheet();
+        navigateWithFade(context, const ProfilePage());
         break;
     }
   }
@@ -173,37 +171,62 @@ class _DashboardPageState extends State<DashboardPage> {
   // ==========================
   // VIDEO CONF
   // ==========================
-  void _joinVideoConference() {
+  // ==========================
+  // VIDEO CONF
+  // ==========================
+  Future<void> _joinVideoConference() async {
+    // 1. Ambil list groups dari Firestore
+    final groups = await _fs.streamMyGroups().first;
+
+    if (!mounted) return;
+
+    // A. Jika tidak punya group
+    if (groups.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Kamu belum punya group. Buat group dulu ya.'),
+        ),
+      );
+      navigateWithFade(context, const CreateGroupPage());
+      return;
+    }
+
+    // B. Jika hanya 1 group -> langsung join
+    if (groups.length == 1) {
+      final g = groups.first;
+      final gid = g['id'] as String;
+      final gName = (g['name'] ?? 'Group Meeting') as String;
+      
+      _launchVideoConference(gid, gName);
+      return;
+    }
+
+    // C. Jika > 1 group -> pilih group
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Join Video Conference'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Select a meeting to join:'),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: const Icon(Icons.video_call),
-                title: const Text('Team Standup'),
-                subtitle: const Text('Today, 10:00 AM'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _launchVideoConference('standup_meeting');
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.video_call),
-                title: const Text('Project Review'),
-                subtitle: const Text('Today, 2:00 PM'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _launchVideoConference('review_meeting');
-                },
-              ),
-            ],
+          title: const Text('Pilih Group untuk Meeting'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: groups.length,
+              itemBuilder: (context, index) {
+                final g = groups[index];
+                final gid = g['id'] as String;
+                final gName = (g['name'] ?? 'Unnamed Group') as String;
+
+                return ListTile(
+                  leading: const Icon(Icons.group, color: Color(0xFF0A2E5C)),
+                  title: Text(gName),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _launchVideoConference(gid, gName);
+                  },
+                );
+              },
+            ),
           ),
           actions: [
             TextButton(
@@ -216,15 +239,13 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  void _launchVideoConference(String meetingId) {
+  void _launchVideoConference(String meetingId, String meetingName) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => VideoConferencePage(
           meetingId: meetingId,
-          meetingName: meetingId == 'standup_meeting'
-              ? 'Team Standup'
-              : 'Project Review',
+          meetingName: meetingName,
         ),
       ),
     );
@@ -1019,56 +1040,7 @@ class _DashboardPageState extends State<DashboardPage> {
   // ==========================
   // SETTINGS
   // ==========================
-  void _showSettingsBottomSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(16),
-        height: 200,
-        child: Column(
-          children: [
-            Container(
-              width: 50,
-              height: 5,
-              decoration: BoxDecoration(
-                color: Colors.grey[400],
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            const SizedBox(height: 20),
-            ListTile(
-              leading: const Icon(
-                Icons.account_circle,
-                color: Color(0xFF0A2E5C),
-              ),
-              title: const Text('Profile'),
-              onTap: () => Navigator.pop(context),
-            ),
-            ListTile(
-              leading: const Icon(
-                Icons.notifications,
-                color: Color(0xFF0A2E5C),
-              ),
-              title: const Text('Notifications'),
-              onTap: () {
-                Navigator.pop(context);
-                navigateWithFade(context, const NotificationPage());
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.help_outline, color: Color(0xFF0A2E5C)),
-              title: const Text('Help & Support'),
-              onTap: () => Navigator.pop(context),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+
 
   // ==========================
   // STATUS UI
