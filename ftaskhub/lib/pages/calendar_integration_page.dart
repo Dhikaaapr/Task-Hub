@@ -74,7 +74,7 @@ class _CalendarIntegrationPageState extends State<CalendarIntegrationPage> {
       ),
       body: Column(
         children: [
-          // Calendar view
+        
           TableCalendar(
             focusedDay: _focusedDay,
             firstDay: DateTime.utc(2020),

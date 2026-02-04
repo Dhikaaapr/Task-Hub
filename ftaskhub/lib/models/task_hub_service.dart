@@ -8,14 +8,14 @@ class TaskHubService {
   factory TaskHubService() => _instance;
   TaskHubService._internal();
 
-  // In-memory storage for demo purposes
+
   final List<Group> _groups = [];
   final List<Task> _tasks = [];
   final List<User> _users = [];
 
-  // Initialize with a default user
+
   void initialize() {
-    // Add current user
+
     if (_users.isEmpty) {
       _users.add(User(
         id: 'current_user_id',
@@ -49,7 +49,7 @@ class TaskHubService {
       name: name,
       description: description,
       creatorId: creatorId,
-      memberIds: [creatorId, ...memberIds], // Add creator as first member
+      memberIds: [creatorId, ...memberIds], 
       createdAt: DateTime.now(),
     );
     _groups.add(group);
@@ -65,11 +65,11 @@ class TaskHubService {
 
   void deleteGroup(String id) {
     _groups.removeWhere((group) => group.id == id);
-    // Also remove all tasks related to this group
+ 
     _tasks.removeWhere((task) => task.groupId == id);
   }
 
-  // Task management
+
   List<Task> getTasksByGroup(String groupId) => 
     _tasks.where((task) => task.groupId == groupId).toList();
   
@@ -109,7 +109,7 @@ class TaskHubService {
     _tasks.removeWhere((task) => task.id == id);
   }
 
-  // User management
+ 
   List<User> getUsers() => _users;
   User? getUserById(String id) => _users.firstWhere((user) => user.id == id, orElse: () => User(
     id: '',
